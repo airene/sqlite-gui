@@ -1,0 +1,38 @@
+# ── 依赖 ──────────────────────────────────────
+node_modules/
+
+# ── 构建产物 / 自动生成（均可由 `deno task build` 等重新生成）──
+# Vite 构建输出
+dist/
+# 由 scripts/embed.js 从 dist/index.html 生成的前端内嵌模块
+server/embedded.js
+# 由 build/icon.svg 生成的应用图标
+build/icon.icns
+# `deno compile` 产出的可执行文件
+sqlite-gui
+# 打包产物（.app / .dmg）
+release/
+
+# ── SQLite 运行时临时文件（读取 WAL 库时产生）──
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite3-wal
+*.sqlite3-shm
+*.db-wal
+*.db-shm
+
+# ── 日志 / 环境变量 ────────────────────────────
+*.log
+npm-debug.log*
+.env
+.env.local
+.env.*.local
+
+# ── macOS / 编辑器 ────────────────────────────
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~
+
+starcontrol-auth.sqlite3
