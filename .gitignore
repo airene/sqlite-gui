@@ -1,17 +1,13 @@
-# ── 依赖 ──────────────────────────────────────
+# ── 前端依赖 / 构建产物 ──────────────────────
 node_modules/
-
-# ── 构建产物 / 自动生成（均可由 `deno task build` 等重新生成）──
-# Vite 构建输出
 dist/
-# 由 scripts/embed.js 从 dist/index.html 生成的前端内嵌模块
-server/embedded.js
-# 由 build/icon.svg 生成的应用图标
-build/icon.icns
-# `deno compile` 产出的可执行文件
-sqlite-gui
-# 打包产物（.app / .dmg）
-release/
+
+# ── Rust / Tauri 构建产物 ─────────────────────
+src-tauri/target/
+src-tauri/gen/schemas/
+
+# 由 build/icon.svg 生成的中间图（src-tauri/icons/ 是最终产物，已提交）
+build/icon-1024.png
 
 # ── SQLite 运行时临时文件（读取 WAL 库时产生）──
 *.sqlite-wal
@@ -35,4 +31,5 @@ npm-debug.log*
 *.swp
 *~
 
+# 测试库含敏感数据（认证哈希/令牌），不纳入版本控制
 starcontrol-auth.sqlite3

@@ -1,14 +1,10 @@
 <script setup>
-import { onMounted, ref } from "vue";
+import { onMounted, onUnmounted, ref } from "vue";
 import { api } from "./api.js";
 import TableList from "./components/TableList.vue";
 import DataView from "./components/DataView.vue";
 
-// When running inside the native app, a real macOS menu bar provides "Open" /
-// "Open Recent", so the in-page button is hidden. In a plain browser (dev) it
-// stays, for convenience.
-const hasNativeMenu = !!window.__NATIVE_MENU__;
-
+// 当前打开的文件、表列表、选中的表、右侧数据、分页大小等状态
 const dbPath = ref(null);
 const tables = ref([]);
 const selected = ref(null);
@@ -17,57 +13,16 @@ const loading = ref(false);
 const error = ref("");
 const pageSize = ref(50);
 
-// Push the recent list into the native menu (no-op in a browser).
-function syncMenu(recent) {
-  if (window.syncRecentMenu) window.syncRecentMenu(recent ?? []);
-}
+// 保存事件取消订阅函数，组件卸载时清理
+let unlisten = [];
 
-function applyOpened(res) {
-  dbPath.value = res.path;
-  tables.value = res.tables;
+// 收到 Rust 端「数据库已打开」事件后，刷新界面
+function applyOpened(payload) {
+  dbPath.value = payload.path;
+  tables.value = payload.tables;
   selected.value = null;
   data.value = null;
-  syncMenu(res.recent);
-}
-
-async function refreshState() {
-  try {
-    const s = await api.state();
-    dbPath.value = s.path;
-    tables.value = s.tables;
-    syncMenu(s.recent);
-  } catch (e) {
-    error.value = e.message;
-  }
-}
-
-async function openDb() {
   error.value = "";
-  try {
-    const res = await api.open();
-    if (!res.canceled) applyOpened(res);
-  } catch (e) {
-    error.value = e.message;
-  }
-}
-
-async function openPath(path) {
-  error.value = "";
-  try {
-    const res = await api.openPath(path);
-    if (!res.canceled) applyOpened(res);
-  } catch (e) {
-    error.value = e.message;
-  }
-}
-
-async function clearRecent() {
-  try {
-    const res = await api.clearRecent();
-    syncMenu(res.recent);
-  } catch (e) {
-    error.value = e.message;
-  }
 }
 
 async function selectTable(name) {
@@ -75,6 +30,7 @@ async function selectTable(name) {
   await loadRows(1);
 }
 
+// 调用 Rust 的 get_rows 取某一页数据
 async function loadRows(page) {
   if (!selected.value) return;
   loading.value = true;
@@ -82,7 +38,7 @@ async function loadRows(page) {
   try {
     data.value = await api.rows(selected.value, page, pageSize.value);
   } catch (e) {
-    error.value = e.message;
+    error.value = String(e);
     data.value = null;
   } finally {
     loading.value = false;
@@ -94,23 +50,23 @@ function changePageSize(n) {
   loadRows(1);
 }
 
-onMounted(() => {
-  // Expose actions for the native menu to call via webview.eval(...).
-  window.__app_open = openDb;
-  window.__app_openPath = openPath;
-  window.__app_clearRecent = clearRecent;
-  refreshState();
+onMounted(async () => {
+  // 打开数据库这件事完全由顶部原生菜单驱动，这里只需监听结果事件
+  unlisten.push(await api.onDbOpened(applyOpened));
+  unlisten.push(await api.onDbError((msg) => (error.value = msg)));
 });
+
+onUnmounted(() => unlisten.forEach((off) => off && off()));
 </script>
 
 <template>
   <div class="app">
+    <!-- 顶部只保留「当前打开哪个文件」的指示，打开操作走菜单栏 -->
     <header class="toolbar">
       <span class="db-indicator" :class="{ muted: !dbPath }" :title="dbPath || ''">
         <span class="db-dot" :class="{ on: dbPath }"></span>
         {{ dbPath || "未打开数据库" }}
       </span>
-      <button v-if="!hasNativeMenu" class="btn" @click="openDb">打开数据库…</button>
     </header>
 
     <div v-if="error" class="error-bar">{{ error }}</div>
@@ -126,7 +82,6 @@ onMounted(() => {
           <div class="no-db-hint">
             从菜单栏「文件 → 打开…」<span class="kbd">⌘O</span> 选择一个 SQLite 文件
           </div>
-          <button v-if="!hasNativeMenu" class="btn primary" @click="openDb">打开数据库…</button>
         </div>
         <DataView
           v-else
